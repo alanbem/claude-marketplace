@@ -159,22 +159,37 @@ ICON_WORKTREE="\xef\x83\x85"  #
 WORKTREE=$(echo "$input" | jq -r '.worktree.name // empty')
 
 # CLI tool auth status (local checks only, no network calls)
+# 3 states: not installed (dimmed), installed but not authenticated (dim red), authenticated (dim green)
 C_AUTH_OK='\033[38;2;70;100;70m'
 C_AUTH_NO='\033[38;2;120;70;70m'
-if aws configure list 2>&1 | grep -q access_key && aws configure list 2>&1 | grep access_key | grep -qv 'not set'; then
+C_AUTH_DIM='\033[38;2;60;60;60m'
+if ! command -v aws &>/dev/null; then
+    AWS_LABEL="${C_AUTH_DIM}aws${RST}"
+elif aws configure list 2>&1 | grep -q access_key && aws configure list 2>&1 | grep access_key | grep -qv 'not set'; then
     AWS_LABEL="${C_AUTH_OK}aws${RST}"
 else
     AWS_LABEL="${C_AUTH_NO}aws${RST}"
 fi
-if gh auth token &>/dev/null; then
+if ! command -v gh &>/dev/null; then
+    GH_LABEL="${C_AUTH_DIM}gh${RST}"
+elif gh auth status &>/dev/null 2>&1; then
     GH_LABEL="${C_AUTH_OK}gh${RST}"
 else
     GH_LABEL="${C_AUTH_NO}gh${RST}"
 fi
-if ~/bin/acli jira auth status &>/dev/null; then
+if ! command -v acli &>/dev/null; then
+    ACLI_LABEL="${C_AUTH_DIM}acli${RST}"
+elif acli jira auth status &>/dev/null; then
     ACLI_LABEL="${C_AUTH_OK}acli${RST}"
 else
     ACLI_LABEL="${C_AUTH_NO}acli${RST}"
+fi
+if ! command -v gws &>/dev/null; then
+    GWS_LABEL="${C_AUTH_DIM}gws${RST}"
+elif gws auth status 2>/dev/null | grep -q '"token_valid": true'; then
+    GWS_LABEL="${C_AUTH_OK}gws${RST}"
+else
+    GWS_LABEL="${C_AUTH_NO}gws${RST}"
 fi
 
 # Account email (from Claude config)
@@ -200,7 +215,7 @@ fi
 # Anthropic brand color (warm tan/sienna)
 ANTHRO='\033[38;2;204;136;68m'
 
-TOOLS_SECTION="${SEP}${ANTHRO}${ICON_CLI}${RST} ${AWS_LABEL} ${DIM}·${RST} ${ANTHRO}${ICON_CLI}${RST} ${GH_LABEL} ${DIM}·${RST} ${ANTHRO}${ICON_CLI}${RST} ${ACLI_LABEL}"
+TOOLS_SECTION="${SEP}${ANTHRO}${ICON_CLI}${RST} ${AWS_LABEL} ${DIM}·${RST} ${ANTHRO}${ICON_CLI}${RST} ${GH_LABEL} ${DIM}·${RST} ${ANTHRO}${ICON_CLI}${RST} ${ACLI_LABEL} ${DIM}·${RST} ${ANTHRO}${ICON_CLI}${RST} ${GWS_LABEL}"
 
 # Build git section only if in a git repo
 if [ "$IS_GIT" -eq 0 ]; then
