@@ -37,10 +37,10 @@ else
     FILLED=$(( PCT * 20 / 100 + 1 ))
     [ "$FILLED" -gt 20 ] && FILLED=20
 fi
-# Zone boundaries as bar positions (token threshold / ctx_size * 20)
-POS_ORANGE=$((350000 * 20 / CTX_SIZE))
-POS_RED=$((400000 * 20 / CTX_SIZE))
-POS_CRIT=$((950000 * 20 / CTX_SIZE))
+# Zone boundaries as bar positions (percentage-based)
+POS_ORANGE=$((30 * 20 / 100))
+POS_RED=$((40 * 20 / 100))
+POS_CRIT=$((80 * 20 / 100))
 # Colors: filled
 C_GREEN='\033[38;2;130;160;130m'
 C_ORANGE='\033[38;5;208m'
