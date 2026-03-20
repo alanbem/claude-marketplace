@@ -152,11 +152,16 @@ ICON_API="\xef\x80\xa1"       #
 ICON_STATS="\xef\x82\x80"     #
 ICON_FOLDER="\xef\x80\x95"    #
 ICON_BRANCH="\xee\x9c\xa5"    #
+ICON_WORKTREE="\xee\x9c\xa5"  #
 ICON_DIFF="\xef\x82\x80"     #
-ICON_WORKTREE="\xef\x83\x85"  #
-
-# Worktree
+# Worktree (native Claude Code field, with git-based fallback)
 WORKTREE=$(echo "$input" | jq -r '.worktree.name // empty')
+if [ -z "$WORKTREE" ]; then
+    GIT_DIR=$(git -C "$CWD" rev-parse --git-dir 2>/dev/null)
+    case "$GIT_DIR" in
+        *"/worktrees/"*) WORKTREE="${GIT_DIR##*/}" ;;
+    esac
+fi
 
 # CLI tool auth status (local checks only, no network calls)
 # 3 states: not installed (dimmed), installed but not authenticated (dim red), authenticated (dim green)
@@ -219,9 +224,14 @@ TOOLS_SECTION="${SEP}${ANTHRO}${ICON_CLI}${RST} ${AWS_LABEL} ${DIM}·${RST} ${AN
 
 # Build git section only if in a git repo
 if [ "$IS_GIT" -eq 0 ]; then
-    WORKTREE_BADGE=""
-    [ -n "$WORKTREE" ] && WORKTREE_BADGE=" ${ICON_WORKTREE}"
-    GIT_SECTION="${SEP}${ANTHRO}${ICON_BRANCH}${RST} ${BRANCH}${WORKTREE_BADGE} ${DIM}·${RST} ${ANTHRO}${ICON_DIFF}${RST} ${DIM_GREEN}+${GIT_ADDED}${RST} ${DIM_RED}−${GIT_REMOVED}${RST}"
+    # Two branch icons: both bright in worktree, second dimmed orange otherwise
+    ANTHRO_DIM='\033[38;2;120;80;40m'
+    if [ -n "$WORKTREE" ]; then
+        GIT_ICONS="${ANTHRO}${ICON_BRANCH}${ICON_WORKTREE}${RST}"
+    else
+        GIT_ICONS="${ANTHRO}${ICON_BRANCH}${ANTHRO_DIM}${ICON_WORKTREE}${RST}"
+    fi
+    GIT_SECTION="${SEP}${GIT_ICONS} ${BRANCH} ${DIM}·${RST} ${ANTHRO}${ICON_DIFF}${RST} ${DIM_GREEN}+${GIT_ADDED}${RST} ${DIM_RED}−${GIT_REMOVED}${RST}"
 else
     GIT_SECTION=""
 fi
