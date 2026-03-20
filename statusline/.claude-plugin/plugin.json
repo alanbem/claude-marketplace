@@ -7,5 +7,7 @@
     "email": "alan.bem@gmail.com"
   },
   "license": "MIT",
+  "homepage": "https://github.com/alanbem/claude-marketplace/tree/master/statusline",
+  "repository": "https://github.com/alanbem/claude-marketplace",
   "keywords": ["statusline", "ui", "terminal", "claude", "claude-code", "plugin", "marketplace"]
 }
