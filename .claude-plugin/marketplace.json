@@ -1,0 +1,22 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "alanbem",
+  "description": "Personal Claude Code plugins by Alan Gabriel Bem",
+  "owner": {
+    "name": "Alan Gabriel Bem",
+    "email": "alan.bem@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "statusline",
+      "description": "Rich statusline for Claude Code with context bar, git status, session stats, account info, and Nerd Font icons",
+      "version": "1.0.0",
+      "author": {
+        "name": "Alan Gabriel Bem",
+        "email": "alan.bem@gmail.com"
+      },
+      "source": "./statusline",
+      "category": "productivity"
+    }
+  ]
+}

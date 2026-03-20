@@ -1,0 +1,221 @@
+#!/bin/bash
+input=$(cat)
+
+# Version
+VERSION=$(echo "$input" | jq -r '.version // "?"')
+
+# Model
+MODEL=$(echo "$input" | jq -r '.model.display_name // "?"' | sed 's/ ([^)]*context)//')
+
+# Context — used_percentage is the actual current context window usage
+CTX_SIZE=$(echo "$input" | jq -r '.context_window.context_window_size // 200000')
+PCT=$(echo "$input" | jq -r '.context_window.used_percentage // 0' | cut -d. -f1)
+PCT=${PCT:-0}
+# Derive current tokens from percentage (matches /context command)
+TOKENS=$((PCT * CTX_SIZE / 100))
+
+# Token abbreviation (numbers dimmed, unit suffix normal)
+abbrev_tokens() {
+    local t=$1
+    local D='\033[38;2;100;100;100m' R='\033[0m'
+    if [ "$t" -ge 1000000 ]; then
+        awk "BEGIN {printf \"${D}%.1f${R}M\", $t/1000000}"
+    elif [ "$t" -ge 1000 ]; then
+        awk "BEGIN {printf \"${D}%.0f${R}k\", $t/1000}"
+    else
+        printf "${D}%s${R}" "$t"
+    fi
+}
+TOKEN_DISPLAY="$(abbrev_tokens "$TOKENS")/$(abbrev_tokens "$CTX_SIZE")"
+
+# Context bar (20 units) with color-coded empty dots showing zone preview
+# Each unit = 5% of context window. Zones based on absolute token thresholds.
+# Each dot covers [i*5%, (i+1)*5%). Fill as soon as tokens enter its range.
+if [ "$PCT" -eq 0 ]; then
+    FILLED=0
+else
+    FILLED=$(( PCT * 20 / 100 + 1 ))
+    [ "$FILLED" -gt 20 ] && FILLED=20
+fi
+# Zone boundaries as bar positions (token threshold / ctx_size * 20)
+POS_ORANGE=$((350000 * 20 / CTX_SIZE))
+POS_RED=$((400000 * 20 / CTX_SIZE))
+POS_CRIT=$((950000 * 20 / CTX_SIZE))
+# Colors: filled
+C_GREEN='\033[38;2;130;160;130m'
+C_ORANGE='\033[38;5;208m'
+C_RED='\033[31m'
+C_CRIT='\033[38;2;255;50;50m'
+# Colors: empty (very faint versions)
+C_GREEN_DIM='\033[38;2;40;50;40m'
+C_ORANGE_DIM='\033[38;2;60;40;20m'
+C_RED_DIM='\033[38;2;55;25;25m'
+C_CRIT_DIM='\033[38;2;55;25;25m'
+RST='\033[0m'
+BAR=""
+for ((i=0; i<20; i++)); do
+    # Determine zone color for this position
+    if [ "$i" -ge "$POS_CRIT" ]; then
+        FC="$C_CRIT"; DC="$C_CRIT_DIM"
+    elif [ "$i" -ge "$POS_RED" ]; then
+        FC="$C_RED"; DC="$C_RED_DIM"
+    elif [ "$i" -ge "$POS_ORANGE" ]; then
+        FC="$C_ORANGE"; DC="$C_ORANGE_DIM"
+    else
+        FC="$C_GREEN"; DC="$C_GREEN_DIM"
+    fi
+    if [ "$i" -lt "$FILLED" ]; then
+        BAR+="${FC}⦿${RST}"
+    else
+        BAR+="${DC}●${RST}"
+    fi
+done
+
+# Context percentage color — matches the last filled dot's zone color
+REMAINING=$((CTX_SIZE - TOKENS))
+if [ "$FILLED" -le 0 ]; then
+    CTX_COLOR="$C_GREEN"
+else
+    # Color of the last filled dot (FILLED-1 is the index)
+    LAST=$((FILLED - 1))
+    if [ "$LAST" -ge "$POS_CRIT" ]; then
+        CTX_COLOR="$C_CRIT"
+    elif [ "$LAST" -ge "$POS_RED" ]; then
+        CTX_COLOR="$C_RED"
+    elif [ "$LAST" -ge "$POS_ORANGE" ]; then
+        CTX_COLOR="$C_ORANGE"
+    else
+        CTX_COLOR="$C_GREEN"
+    fi
+fi
+
+# Workspace dirs
+CWD=$(echo "$input" | jq -r '.workspace.current_dir // "."')
+PROJECT_DIR=$(echo "$input" | jq -r '.workspace.project_dir // "."')
+
+# Lines changed (git diff on current branch + session totals)
+GREEN='\033[32m'
+RED='\033[31m'
+DIM_GREEN='\033[38;2;70;100;70m'
+DIM_RED='\033[38;2;120;70;70m'
+GIT_DIFF=$(git -C "$CWD" diff --shortstat HEAD 2>/dev/null)
+GIT_ADDED=$(echo "$GIT_DIFF" | grep -oP '\d+(?= insertion)' || echo "0")
+GIT_REMOVED=$(echo "$GIT_DIFF" | grep -oP '\d+(?= deletion)' || echo "0")
+GIT_ADDED=${GIT_ADDED:-0}
+GIT_REMOVED=${GIT_REMOVED:-0}
+TOTAL_ADDED=$(echo "$input" | jq -r '.cost.total_lines_added // 0')
+TOTAL_REMOVED=$(echo "$input" | jq -r '.cost.total_lines_removed // 0')
+
+# Duration
+TOTAL_MS=$(echo "$input" | jq -r '.cost.total_duration_ms // 0' | cut -d. -f1)
+API_MS=$(echo "$input" | jq -r '.cost.total_api_duration_ms // 0' | cut -d. -f1)
+
+# Progressive format — most significant units, no seconds:
+# <1m -> 1m -> 59m -> 1h -> 1h1m -> 1h59m -> 2h -> 2h1m -> 23h59m ->
+# 1d -> 1d1m -> 1d59m -> 1d1h -> 1d1h1m -> 1d1h59m -> 1d2h -> ...
+format_duration() {
+    local ms=$1
+    local D='\033[38;2;100;100;100m' R='\033[0m'
+    local total_secs=$((ms / 1000))
+    local days=$((total_secs / 86400))
+    local hours=$(( (total_secs % 86400) / 3600 ))
+    local mins=$(( (total_secs % 3600) / 60 ))
+    if [ "$days" -gt 0 ]; then
+        local out="${D}${days}${R}d"
+        [ "$hours" -gt 0 ] && out="${out}${D}${hours}${R}h"
+        [ "$mins" -gt 0 ] && out="${out}${D}${mins}${R}m"
+        printf "%s" "$out"
+    elif [ "$hours" -gt 0 ]; then
+        local out="${D}${hours}${R}h"
+        [ "$mins" -gt 0 ] && out="${out}${D}${mins}${R}m"
+        printf "%s" "$out"
+    elif [ "$mins" -gt 0 ]; then
+        printf "%s" "${D}${mins}${R}m"
+    else
+        printf "%s" "${D}<${R}1m"
+    fi
+}
+
+DURATION=$(format_duration "$TOTAL_MS")
+API_TIME=$(format_duration "$API_MS")
+
+# Git branch
+BRANCH=$(git -C "$CWD" rev-parse --abbrev-ref HEAD 2>/dev/null)
+IS_GIT=$?
+
+# Icons (UTF-8 bytes — macOS bash 3.2 doesn't support \u)
+ICON_VERSION="\xef\x81\xa9"   #
+ICON_MODEL="\xef\x83\xa7"     #
+ICON_CONTEXT="\xef\x83\x87"   #
+ICON_DURATION="\xef\x80\x97"  #
+ICON_API="\xef\x80\xa1"       #
+ICON_STATS="\xef\x82\x80"     #
+ICON_FOLDER="\xef\x80\x95"    #
+ICON_BRANCH="\xee\x9c\xa5"    #
+ICON_DIFF="\xef\x82\x80"     #
+ICON_WORKTREE="\xef\x83\x85"  #
+
+# Worktree
+WORKTREE=$(echo "$input" | jq -r '.worktree.name // empty')
+
+# CLI tool auth status (local checks only, no network calls)
+C_AUTH_OK='\033[38;2;70;100;70m'
+C_AUTH_NO='\033[38;2;120;70;70m'
+if aws configure list 2>&1 | grep -q access_key && aws configure list 2>&1 | grep access_key | grep -qv 'not set'; then
+    AWS_LABEL="${C_AUTH_OK}aws${RST}"
+else
+    AWS_LABEL="${C_AUTH_NO}aws${RST}"
+fi
+if gh auth token &>/dev/null; then
+    GH_LABEL="${C_AUTH_OK}gh${RST}"
+else
+    GH_LABEL="${C_AUTH_NO}gh${RST}"
+fi
+if ~/bin/acli jira auth status &>/dev/null; then
+    ACLI_LABEL="${C_AUTH_OK}acli${RST}"
+else
+    ACLI_LABEL="${C_AUTH_NO}acli${RST}"
+fi
+
+# Account email (from Claude config)
+ACCOUNT_EMAIL=$(jq -r '.oauthAccount.emailAddress // empty' ~/.claude/.claude.json 2>/dev/null)
+ICON_USER="\xef\x80\x87"   #
+
+# Separator
+SEP=" │ "
+ICON_CLI="\xef\x84\xa0"
+
+# Folder (project basename + relative path from project dir)
+PROJECT_BASE=$(basename "$PROJECT_DIR")
+REL_FROM_PROJECT=$(realpath --relative-to="$PROJECT_DIR" "$CWD" 2>/dev/null || echo ".")
+DIM='\033[38;2;100;100;100m'
+if [ "$REL_FROM_PROJECT" = "." ]; then
+    FOLDER="${PROJECT_BASE}/"
+else
+    FOLDER="${PROJECT_BASE}/${DIM}${REL_FROM_PROJECT}${RST}"
+fi
+
+
+# Output
+# Anthropic brand color (warm tan/sienna)
+ANTHRO='\033[38;2;204;136;68m'
+
+TOOLS_SECTION="${SEP}${ANTHRO}${ICON_CLI}${RST} ${AWS_LABEL} ${DIM}·${RST} ${ANTHRO}${ICON_CLI}${RST} ${GH_LABEL} ${DIM}·${RST} ${ANTHRO}${ICON_CLI}${RST} ${ACLI_LABEL}"
+
+# Build git section only if in a git repo
+if [ "$IS_GIT" -eq 0 ]; then
+    WORKTREE_BADGE=""
+    [ -n "$WORKTREE" ] && WORKTREE_BADGE=" ${ICON_WORKTREE}"
+    GIT_SECTION="${SEP}${ANTHRO}${ICON_BRANCH}${RST} ${BRANCH}${WORKTREE_BADGE} ${DIM}·${RST} ${ANTHRO}${ICON_DIFF}${RST} ${DIM_GREEN}+${GIT_ADDED}${RST} ${DIM_RED}−${GIT_REMOVED}${RST}"
+else
+    GIT_SECTION=""
+fi
+
+ACCOUNT_SECTION=""
+if [ -n "$ACCOUNT_EMAIL" ]; then
+    EMAIL_USER="${ACCOUNT_EMAIL%%@*}"
+    EMAIL_DOMAIN="${ACCOUNT_EMAIL#*@}"
+    ACCOUNT_SECTION="${SEP}${ANTHRO}${ICON_USER}${RST} ${EMAIL_USER}${DIM}@${RST}${EMAIL_DOMAIN}"
+fi
+
+echo -e "${ANTHRO}${ICON_VERSION}${RST} v${VERSION}${SEP}${ANTHRO}${ICON_MODEL}${RST} ${MODEL}${ACCOUNT_SECTION}${SEP}${ANTHRO}${ICON_CONTEXT}${RST} ${CTX_COLOR}${PCT}% ${BAR}${RST} ${TOKEN_DISPLAY}${SEP}${ANTHRO}${ICON_DURATION}${RST} ${DURATION} ${DIM}·${RST} ${ANTHRO}${ICON_API}${RST} ${API_TIME} ${DIM}·${RST} ${ANTHRO}${ICON_STATS}${RST} ${DIM_GREEN}✚${TOTAL_ADDED}${RST} ${DIM_RED}−${TOTAL_REMOVED}${RST}${GIT_SECTION}${TOOLS_SECTION}${SEP}${ANTHRO}${ICON_FOLDER}${RST} ${FOLDER}\n\xe2\x80\x8b"

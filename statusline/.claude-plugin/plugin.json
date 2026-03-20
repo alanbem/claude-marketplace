@@ -1,0 +1,11 @@
+{
+  "name": "statusline",
+  "version": "1.0.0",
+  "description": "Rich statusline for Claude Code with context bar, git status, session stats, account info, and Nerd Font icons.",
+  "author": {
+    "name": "Alan Gabriel Bem",
+    "email": "alan.bem@gmail.com"
+  },
+  "license": "MIT",
+  "keywords": ["statusline", "ui", "terminal", "claude", "claude-code", "plugin", "marketplace"]
+}
