@@ -39,15 +39,27 @@ Durations use progressive formatting: `<1m` → `5m` → `1h30m` → `1d2h15m`. 
 
 ### Git
 
-Only shown inside a git repository.
-
 **Double branch icon** — two branch glyphs side by side indicate worktree awareness:
 - **Both bright orange** — you're in a git worktree
 - **First bright, second dimmed** — normal repo (the dimmed second icon subtly hints at worktree capability)
+- **Both dimmed gray** — not inside a git repository
 
 Worktree detection works two ways: via Claude Code's native worktree field, and as a fallback by checking `git rev-parse --git-dir` for a `/worktrees/<name>` path.
 
-After the branch name, a `·` separator leads to the diff stats: lines added (dim green `+`) and removed (dim red `−`) compared to HEAD.
+**Ahead/behind remote** — shown after the branch name as arrows:
+- `↑2` (dim green) — commits ahead of remote
+- `↓1` (dim red) — commits behind remote
+- Zeros shown in dimmed white when there's nothing to push/pull
+
+**File stats** — changes at the file level compared to HEAD:
+- `+1` (dim green) — new files added
+- `~3` (dim orange) — files modified
+- `−0` (dim red) — files deleted
+- `?2` (dimmed white) — untracked files (not yet tracked by git)
+
+**Line stats** — insertions and deletions compared to HEAD:
+- `+142` (dim green) — lines added
+- `−37` (dim red) — lines removed
 
 ### CLI Auth Status
 

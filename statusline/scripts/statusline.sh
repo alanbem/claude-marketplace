@@ -94,17 +94,21 @@ CWD=$(echo "$input" | jq -r '.workspace.current_dir // "."')
 PROJECT_DIR=$(echo "$input" | jq -r '.workspace.project_dir // "."')
 
 # Lines changed (git diff on current branch + session totals)
-GREEN='\033[32m'
-RED='\033[31m'
 DIM_GREEN='\033[38;2;70;100;70m'
 DIM_RED='\033[38;2;120;70;70m'
-GIT_DIFF=$(git -C "$CWD" diff --shortstat HEAD 2>/dev/null)
-GIT_ADDED=$(echo "$GIT_DIFF" | grep -oP '\d+(?= insertion)' || echo "0")
-GIT_REMOVED=$(echo "$GIT_DIFF" | grep -oP '\d+(?= deletion)' || echo "0")
-GIT_ADDED=${GIT_ADDED:-0}
-GIT_REMOVED=${GIT_REMOVED:-0}
-TOTAL_ADDED=$(echo "$input" | jq -r '.cost.total_lines_added // 0')
-TOTAL_REMOVED=$(echo "$input" | jq -r '.cost.total_lines_removed // 0')
+GIT_LINE_DIFF=$(git -C "$CWD" diff --shortstat HEAD 2>/dev/null)
+GIT_LINES_ADDED=$(echo "$GIT_LINE_DIFF" | grep -oP '\d+(?= insertion)' || echo "0")
+GIT_LINES_REMOVED=$(echo "$GIT_LINE_DIFF" | grep -oP '\d+(?= deletion)' || echo "0")
+GIT_LINES_ADDED=${GIT_LINES_ADDED:-0}
+GIT_LINES_REMOVED=${GIT_LINES_REMOVED:-0}
+# File-level changes (modified, added, deleted)
+GIT_FILES_MODIFIED=$(git -C "$CWD" diff --diff-filter=M --name-only HEAD 2>/dev/null | wc -l | tr -d ' ')
+GIT_FILES_ADDED=$(git -C "$CWD" diff --diff-filter=A --name-only HEAD 2>/dev/null | wc -l | tr -d ' ')
+GIT_FILES_DELETED=$(git -C "$CWD" diff --diff-filter=D --name-only HEAD 2>/dev/null | wc -l | tr -d ' ')
+GIT_FILES_UNTRACKED=$(git -C "$CWD" ls-files --others --exclude-standard 2>/dev/null | wc -l | tr -d ' ')
+DIM_ORANGE='\033[38;2;140;100;50m'
+SESSION_LINES_ADDED=$(echo "$input" | jq -r '.cost.total_lines_added // 0')
+SESSION_LINES_REMOVED=$(echo "$input" | jq -r '.cost.total_lines_removed // 0')
 
 # Duration
 TOTAL_MS=$(echo "$input" | jq -r '.cost.total_duration_ms // 0' | cut -d. -f1)
@@ -136,6 +140,16 @@ format_duration() {
     fi
 }
 
+# Commits ahead/behind remote
+GIT_AHEAD=0
+GIT_BEHIND=0
+GIT_UPSTREAM=$(git -C "$CWD" rev-parse --abbrev-ref '@{upstream}' 2>/dev/null)
+if [ -n "$GIT_UPSTREAM" ]; then
+    GIT_AB=$(git -C "$CWD" rev-list --left-right --count HEAD...'@{upstream}' 2>/dev/null)
+    GIT_AHEAD=$(echo "$GIT_AB" | cut -f1)
+    GIT_BEHIND=$(echo "$GIT_AB" | cut -f2)
+fi
+
 DURATION=$(format_duration "$TOTAL_MS")
 API_TIME=$(format_duration "$API_MS")
 
@@ -153,6 +167,7 @@ ICON_STATS="\xef\x82\x80"     #
 ICON_FOLDER="\xef\x80\x95"    #
 ICON_BRANCH="\xee\x9c\xa5"    #
 ICON_WORKTREE="\xee\x9c\xa5"  #
+ICON_FILES="\xef\x81\x84"    #
 ICON_DIFF="\xef\x82\x80"     #
 # Worktree (native Claude Code field, with git-based fallback)
 WORKTREE=$(echo "$input" | jq -r '.worktree.name // empty')
@@ -165,36 +180,36 @@ fi
 
 # CLI tool auth status (local checks only, no network calls)
 # 3 states: not installed (dimmed), installed but not authenticated (dim red), authenticated (dim green)
-C_AUTH_OK='\033[38;2;70;100;70m'
-C_AUTH_NO='\033[38;2;120;70;70m'
-C_AUTH_DIM='\033[38;2;60;60;60m'
+CLI_AUTH_YES='\033[38;2;70;100;70m'
+CLI_AUTH_NO='\033[38;2;120;70;70m'
+CLI_NOT_FOUND='\033[38;2;60;60;60m'
 if ! command -v aws &>/dev/null; then
-    AWS_LABEL="${C_AUTH_DIM}aws${RST}"
+    AWS_LABEL="${CLI_NOT_FOUND}aws${RST}"
 elif aws configure list 2>&1 | grep -q access_key && aws configure list 2>&1 | grep access_key | grep -qv 'not set'; then
-    AWS_LABEL="${C_AUTH_OK}aws${RST}"
+    AWS_LABEL="${CLI_AUTH_YES}aws${RST}"
 else
-    AWS_LABEL="${C_AUTH_NO}aws${RST}"
+    AWS_LABEL="${CLI_AUTH_NO}aws${RST}"
 fi
 if ! command -v gh &>/dev/null; then
-    GH_LABEL="${C_AUTH_DIM}gh${RST}"
+    GH_LABEL="${CLI_NOT_FOUND}gh${RST}"
 elif gh auth status &>/dev/null 2>&1; then
-    GH_LABEL="${C_AUTH_OK}gh${RST}"
+    GH_LABEL="${CLI_AUTH_YES}gh${RST}"
 else
-    GH_LABEL="${C_AUTH_NO}gh${RST}"
+    GH_LABEL="${CLI_AUTH_NO}gh${RST}"
 fi
 if ! command -v acli &>/dev/null; then
-    ACLI_LABEL="${C_AUTH_DIM}acli${RST}"
+    ACLI_LABEL="${CLI_NOT_FOUND}acli${RST}"
 elif acli jira auth status &>/dev/null; then
-    ACLI_LABEL="${C_AUTH_OK}acli${RST}"
+    ACLI_LABEL="${CLI_AUTH_YES}acli${RST}"
 else
-    ACLI_LABEL="${C_AUTH_NO}acli${RST}"
+    ACLI_LABEL="${CLI_AUTH_NO}acli${RST}"
 fi
 if ! command -v gws &>/dev/null; then
-    GWS_LABEL="${C_AUTH_DIM}gws${RST}"
+    GWS_LABEL="${CLI_NOT_FOUND}gws${RST}"
 elif gws auth status 2>/dev/null | grep -q '"token_valid": true'; then
-    GWS_LABEL="${C_AUTH_OK}gws${RST}"
+    GWS_LABEL="${CLI_AUTH_YES}gws${RST}"
 else
-    GWS_LABEL="${C_AUTH_NO}gws${RST}"
+    GWS_LABEL="${CLI_AUTH_NO}gws${RST}"
 fi
 
 # Account email (from Claude config)
@@ -231,9 +246,21 @@ if [ "$IS_GIT" -eq 0 ]; then
     else
         GIT_ICONS="${ANTHRO}${ICON_BRANCH}${ANTHRO_DIM}${ICON_WORKTREE}${RST}"
     fi
-    GIT_SECTION="${SEP}${GIT_ICONS} ${BRANCH} ${DIM}·${RST} ${ANTHRO}${ICON_DIFF}${RST} ${DIM_GREEN}+${GIT_ADDED}${RST} ${DIM_RED}−${GIT_REMOVED}${RST}"
+    # Ahead/behind remote
+    if [ "$GIT_AHEAD" -gt 0 ]; then
+        GIT_AHEAD_DISPLAY="${DIM_GREEN}↑${GIT_AHEAD}${RST}"
+    else
+        GIT_AHEAD_DISPLAY="${DIM}↑${GIT_AHEAD}${RST}"
+    fi
+    if [ "$GIT_BEHIND" -gt 0 ]; then
+        GIT_BEHIND_DISPLAY="${DIM_RED}↓${GIT_BEHIND}${RST}"
+    else
+        GIT_BEHIND_DISPLAY="${DIM}↓${GIT_BEHIND}${RST}"
+    fi
+    GIT_AB_DISPLAY=" ${GIT_AHEAD_DISPLAY}${GIT_BEHIND_DISPLAY}"
+    GIT_SECTION="${SEP}${GIT_ICONS} ${BRANCH}${GIT_AB_DISPLAY} ${DIM}·${RST} ${ANTHRO}${ICON_FILES}${RST} ${DIM_GREEN}+${GIT_FILES_ADDED}${RST} ${DIM_ORANGE}~${GIT_FILES_MODIFIED}${RST} ${DIM_RED}−${GIT_FILES_DELETED}${RST} ${DIM}?${GIT_FILES_UNTRACKED}${RST} ${DIM}·${RST} ${ANTHRO}${ICON_DIFF}${RST} ${DIM_GREEN}+${GIT_LINES_ADDED}${RST} ${DIM_RED}−${GIT_LINES_REMOVED}${RST}"
 else
-    GIT_SECTION=""
+    GIT_SECTION="${SEP}${CLI_NOT_FOUND}${ICON_BRANCH}${ICON_WORKTREE}${RST}"
 fi
 
 ACCOUNT_SECTION=""
@@ -243,4 +270,4 @@ if [ -n "$ACCOUNT_EMAIL" ]; then
     ACCOUNT_SECTION="${SEP}${ANTHRO}${ICON_USER}${RST} ${EMAIL_USER}${DIM}@${RST}${EMAIL_DOMAIN}"
 fi
 
-echo -e "${ANTHRO}${ICON_VERSION}${RST} v${VERSION}${SEP}${ANTHRO}${ICON_MODEL}${RST} ${MODEL}${ACCOUNT_SECTION}${SEP}${ANTHRO}${ICON_CONTEXT}${RST} ${CTX_COLOR}${PCT}% ${BAR}${RST} ${TOKEN_DISPLAY}${SEP}${ANTHRO}${ICON_DURATION}${RST} ${DURATION} ${DIM}·${RST} ${ANTHRO}${ICON_API}${RST} ${API_TIME} ${DIM}·${RST} ${ANTHRO}${ICON_STATS}${RST} ${DIM_GREEN}✚${TOTAL_ADDED}${RST} ${DIM_RED}−${TOTAL_REMOVED}${RST}${GIT_SECTION}${TOOLS_SECTION}${SEP}${ANTHRO}${ICON_FOLDER}${RST} ${FOLDER}\n\xe2\x80\x8b"
+echo -e "${ANTHRO}${ICON_VERSION}${RST} v${VERSION}${SEP}${ANTHRO}${ICON_MODEL}${RST} ${MODEL}${ACCOUNT_SECTION}${SEP}${ANTHRO}${ICON_CONTEXT}${RST} ${CTX_COLOR}${PCT}% ${BAR}${RST} ${TOKEN_DISPLAY}${SEP}${ANTHRO}${ICON_DURATION}${RST} ${DURATION} ${DIM}·${RST} ${ANTHRO}${ICON_API}${RST} ${API_TIME} ${DIM}·${RST} ${ANTHRO}${ICON_STATS}${RST} ${DIM_GREEN}✚${SESSION_LINES_ADDED}${RST} ${DIM_RED}−${SESSION_LINES_REMOVED}${RST}${GIT_SECTION}${TOOLS_SECTION}${SEP}${ANTHRO}${ICON_FOLDER}${RST} ${FOLDER}\n\xe2\x80\x8b"

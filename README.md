@@ -6,7 +6,7 @@ A collection of personal plugins for [Claude Code](https://claude.ai/code).
 
 | Plugin | Description |
 |--------|-------------|
-| [statusline](./statusline) | Rich statusline with context bar, git status, session stats, and account info |
+| [statusline](./statusline) | Rich statusline with context bar, git file/line stats, ahead/behind, worktree detection, CLI auth indicators, and session stats |
 
 ## Installation
 
