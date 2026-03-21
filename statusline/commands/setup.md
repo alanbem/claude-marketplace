@@ -95,7 +95,7 @@ Tell the user:
 ```
 Statusline configured in [filename].
 
-It will activate on your next Claude Code session. Features:
+It will activate immediately. Features:
 - Context window bar with color-coded zones (green → orange → red → critical)
 - Model name and version
 - Account email

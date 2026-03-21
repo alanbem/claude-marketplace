@@ -20,7 +20,7 @@ Add this marketplace to your `.claude/settings.json` or `.claude/settings.local.
     "alanbem": {
       "source": {
         "source": "github",
-        "repo": "alanbem/claude-marketplace"
+        "repo": "alanbem/claude-plugins"
       }
     }
   }
