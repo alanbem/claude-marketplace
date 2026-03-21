@@ -42,27 +42,27 @@ POS_ORANGE=$((30 * 20 / 100))
 POS_RED=$((40 * 20 / 100))
 POS_CRIT=$((80 * 20 / 100))
 # Colors: filled
-C_GREEN='\033[38;2;130;160;130m'
-C_ORANGE='\033[38;5;208m'
-C_RED='\033[31m'
-C_CRIT='\033[38;2;255;50;50m'
+BAR_ZONE_OK='\033[38;2;130;160;130m'
+BAR_ZONE_WARN='\033[38;5;208m'
+BAR_ZONE_HIGH='\033[31m'
+BAR_ZONE_CRITICAL='\033[38;2;255;50;50m'
 # Colors: empty (very faint versions)
-C_GREEN_DIM='\033[38;2;40;50;40m'
-C_ORANGE_DIM='\033[38;2;60;40;20m'
-C_RED_DIM='\033[38;2;55;25;25m'
-C_CRIT_DIM='\033[38;2;55;25;25m'
+BAR_ZONE_OK_DIM='\033[38;2;40;50;40m'
+BAR_ZONE_WARN_DIM='\033[38;2;60;40;20m'
+BAR_ZONE_HIGH_DIM='\033[38;2;55;25;25m'
+BAR_ZONE_CRITICAL_DIM='\033[38;2;55;25;25m'
 RST='\033[0m'
 BAR=""
 for ((i=0; i<20; i++)); do
     # Determine zone color for this position
     if [ "$i" -ge "$POS_CRIT" ]; then
-        FC="$C_CRIT"; DC="$C_CRIT_DIM"
+        FC="$BAR_ZONE_CRITICAL"; DC="$BAR_ZONE_CRITICAL_DIM"
     elif [ "$i" -ge "$POS_RED" ]; then
-        FC="$C_RED"; DC="$C_RED_DIM"
+        FC="$BAR_ZONE_HIGH"; DC="$BAR_ZONE_HIGH_DIM"
     elif [ "$i" -ge "$POS_ORANGE" ]; then
-        FC="$C_ORANGE"; DC="$C_ORANGE_DIM"
+        FC="$BAR_ZONE_WARN"; DC="$BAR_ZONE_WARN_DIM"
     else
-        FC="$C_GREEN"; DC="$C_GREEN_DIM"
+        FC="$BAR_ZONE_OK"; DC="$BAR_ZONE_OK_DIM"
     fi
     if [ "$i" -lt "$FILLED" ]; then
         BAR+="${FC}⦿${RST}"
@@ -74,18 +74,18 @@ done
 # Context percentage color — matches the last filled dot's zone color
 REMAINING=$((CTX_SIZE - TOKENS))
 if [ "$FILLED" -le 0 ]; then
-    CTX_COLOR="$C_GREEN"
+    CTX_COLOR="$BAR_ZONE_OK"
 else
     # Color of the last filled dot (FILLED-1 is the index)
     LAST=$((FILLED - 1))
     if [ "$LAST" -ge "$POS_CRIT" ]; then
-        CTX_COLOR="$C_CRIT"
+        CTX_COLOR="$BAR_ZONE_CRITICAL"
     elif [ "$LAST" -ge "$POS_RED" ]; then
-        CTX_COLOR="$C_RED"
+        CTX_COLOR="$BAR_ZONE_HIGH"
     elif [ "$LAST" -ge "$POS_ORANGE" ]; then
-        CTX_COLOR="$C_ORANGE"
+        CTX_COLOR="$BAR_ZONE_WARN"
     else
-        CTX_COLOR="$C_GREEN"
+        CTX_COLOR="$BAR_ZONE_OK"
     fi
 fi
 
@@ -94,8 +94,8 @@ CWD=$(echo "$input" | jq -r '.workspace.current_dir // "."')
 PROJECT_DIR=$(echo "$input" | jq -r '.workspace.project_dir // "."')
 
 # Lines changed (git diff on current branch + session totals)
-DIM_GREEN='\033[38;2;70;100;70m'
-DIM_RED='\033[38;2;120;70;70m'
+COLOR_GREEN_DIM='\033[38;2;70;100;70m'
+COLOR_RED_DIM='\033[38;2;120;70;70m'
 GIT_LINE_DIFF=$(git -C "$CWD" diff --shortstat HEAD 2>/dev/null)
 GIT_LINES_ADDED=$(echo "$GIT_LINE_DIFF" | grep -oP '\d+(?= insertion)' || echo "0")
 GIT_LINES_REMOVED=$(echo "$GIT_LINE_DIFF" | grep -oP '\d+(?= deletion)' || echo "0")
@@ -106,7 +106,7 @@ GIT_FILES_MODIFIED=$(git -C "$CWD" diff --diff-filter=M --name-only HEAD 2>/dev/
 GIT_FILES_ADDED=$(git -C "$CWD" diff --diff-filter=A --name-only HEAD 2>/dev/null | wc -l | tr -d ' ')
 GIT_FILES_DELETED=$(git -C "$CWD" diff --diff-filter=D --name-only HEAD 2>/dev/null | wc -l | tr -d ' ')
 GIT_FILES_UNTRACKED=$(git -C "$CWD" ls-files --others --exclude-standard 2>/dev/null | wc -l | tr -d ' ')
-DIM_ORANGE='\033[38;2;140;100;50m'
+COLOR_ORANGE_DIM='\033[38;2;140;100;50m'
 SESSION_LINES_ADDED=$(echo "$input" | jq -r '.cost.total_lines_added // 0')
 SESSION_LINES_REMOVED=$(echo "$input" | jq -r '.cost.total_lines_removed // 0')
 
@@ -223,76 +223,79 @@ ICON_CLI="\xef\x84\xa0"
 # Folder (project basename + relative path from project dir)
 PROJECT_BASE=$(basename "$PROJECT_DIR")
 REL_FROM_PROJECT=$(realpath --relative-to="$PROJECT_DIR" "$CWD" 2>/dev/null || echo ".")
-DIM='\033[38;2;100;100;100m'
+COLOR_WHITE_DIM='\033[38;2;100;100;100m'
 if [ "$REL_FROM_PROJECT" = "." ]; then
     FOLDER="${PROJECT_BASE}/"
 else
-    FOLDER="${PROJECT_BASE}/${DIM}${REL_FROM_PROJECT}${RST}"
+    FOLDER="${PROJECT_BASE}/${COLOR_WHITE_DIM}${REL_FROM_PROJECT}${RST}"
 fi
 
 
 # Output
 # Anthropic brand color (warm tan/sienna)
-ANTHRO='\033[38;2;204;136;68m'
-ANTHRO_DIM='\033[38;2;120;80;40m'
-VERY_DIM='\033[38;2;50;50;50m'
+COLOR_ANTHRO='\033[38;2;204;136;68m'
+COLOR_ANTHRO_DIM='\033[38;2;120;80;40m'
+COLOR_WHITE_DIM_VERY='\033[38;2;50;50;50m'
+COLOR_GREEN_DIM_VERY='\033[38;2;40;60;40m'
+COLOR_RED_DIM_VERY='\033[38;2;70;40;40m'
+COLOR_ORANGE_DIM_VERY='\033[38;2;60;45;25m'
 
-TOOLS_SECTION="${SEP}${ANTHRO}${ICON_CLI}${RST} ${AWS_LABEL} ${DIM}·${RST} ${ANTHRO}${ICON_CLI}${RST} ${GH_LABEL} ${DIM}·${RST} ${ANTHRO}${ICON_CLI}${RST} ${ACLI_LABEL} ${DIM}·${RST} ${ANTHRO}${ICON_CLI}${RST} ${GWS_LABEL}"
+TOOLS_SECTION="${SEP}${COLOR_ANTHRO}${ICON_CLI}${RST} ${AWS_LABEL} ${COLOR_WHITE_DIM}·${RST} ${COLOR_ANTHRO}${ICON_CLI}${RST} ${GH_LABEL} ${COLOR_WHITE_DIM}·${RST} ${COLOR_ANTHRO}${ICON_CLI}${RST} ${ACLI_LABEL} ${COLOR_WHITE_DIM}·${RST} ${COLOR_ANTHRO}${ICON_CLI}${RST} ${GWS_LABEL}"
 
 # Build git section only if in a git repo
 if [ "$IS_GIT" -eq 0 ]; then
     # Two branch icons: both bright in worktree, second dimmed orange otherwise
     if [ -n "$WORKTREE" ]; then
-        GIT_ICONS="${ANTHRO}${ICON_BRANCH}${ICON_WORKTREE}${RST}"
+        GIT_ICONS="${COLOR_ANTHRO}${ICON_BRANCH}${ICON_WORKTREE}${RST}"
     else
-        GIT_ICONS="${ANTHRO}${ICON_BRANCH}${ANTHRO_DIM}${ICON_WORKTREE}${RST}"
+        GIT_ICONS="${COLOR_ANTHRO}${ICON_BRANCH}${COLOR_ANTHRO_DIM}${ICON_WORKTREE}${RST}"
     fi
     # Ahead/behind remote
     if [ "$GIT_AHEAD" -gt 0 ]; then
-        GIT_AHEAD_DISPLAY="${DIM_GREEN}↑${GIT_AHEAD}${RST}"
+        GIT_AHEAD_DISPLAY="${COLOR_GREEN_DIM}↑${GIT_AHEAD}${RST}"
     else
-        GIT_AHEAD_DISPLAY="${DIM}↑${GIT_AHEAD}${RST}"
+        GIT_AHEAD_DISPLAY="${COLOR_GREEN_DIM_VERY}↑${GIT_AHEAD}${RST}"
     fi
     if [ "$GIT_BEHIND" -gt 0 ]; then
-        GIT_BEHIND_DISPLAY="${DIM_RED}↓${GIT_BEHIND}${RST}"
+        GIT_BEHIND_DISPLAY="${COLOR_RED_DIM}↓${GIT_BEHIND}${RST}"
     else
-        GIT_BEHIND_DISPLAY="${DIM}↓${GIT_BEHIND}${RST}"
+        GIT_BEHIND_DISPLAY="${COLOR_RED_DIM_VERY}↓${GIT_BEHIND}${RST}"
     fi
     GIT_AB_DISPLAY=" ${GIT_AHEAD_DISPLAY}${GIT_BEHIND_DISPLAY}"
     # Dim entire subsection (icon + values) when all values are zero
     if [ "$GIT_FILES_ADDED" -eq 0 ] && [ "$GIT_FILES_MODIFIED" -eq 0 ] && [ "$GIT_FILES_DELETED" -eq 0 ] && [ "$GIT_FILES_UNTRACKED" -eq 0 ]; then
-        FILES_ICON="${ANTHRO_DIM}${ICON_FILES}${RST}"
-        FILES_VALS="${VERY_DIM}+${GIT_FILES_ADDED} ~${GIT_FILES_MODIFIED} −${GIT_FILES_DELETED} ?${GIT_FILES_UNTRACKED}${RST}"
+        FILES_ICON="${COLOR_ANTHRO_DIM}${ICON_FILES}${RST}"
+        FILES_VALS="${COLOR_GREEN_DIM_VERY}+${GIT_FILES_ADDED}${RST} ${COLOR_ORANGE_DIM_VERY}~${GIT_FILES_MODIFIED}${RST} ${COLOR_RED_DIM_VERY}−${GIT_FILES_DELETED}${RST} ${COLOR_WHITE_DIM_VERY}?${GIT_FILES_UNTRACKED}${RST}"
     else
-        FILES_ICON="${ANTHRO}${ICON_FILES}${RST}"
-        FILES_VALS="${DIM_GREEN}+${GIT_FILES_ADDED}${RST} ${DIM_ORANGE}~${GIT_FILES_MODIFIED}${RST} ${DIM_RED}−${GIT_FILES_DELETED}${RST} ${DIM}?${GIT_FILES_UNTRACKED}${RST}"
+        FILES_ICON="${COLOR_ANTHRO}${ICON_FILES}${RST}"
+        FILES_VALS="${COLOR_GREEN_DIM}+${GIT_FILES_ADDED}${RST} ${COLOR_ORANGE_DIM}~${GIT_FILES_MODIFIED}${RST} ${COLOR_RED_DIM}−${GIT_FILES_DELETED}${RST} ${COLOR_WHITE_DIM}?${GIT_FILES_UNTRACKED}${RST}"
     fi
     if [ "$GIT_LINES_ADDED" -eq 0 ] && [ "$GIT_LINES_REMOVED" -eq 0 ]; then
-        DIFF_ICON="${ANTHRO_DIM}${ICON_DIFF}${RST}"
-        DIFF_VALS="${VERY_DIM}+${GIT_LINES_ADDED} −${GIT_LINES_REMOVED}${RST}"
+        DIFF_ICON="${COLOR_ANTHRO_DIM}${ICON_DIFF}${RST}"
+        DIFF_VALS="${COLOR_GREEN_DIM_VERY}+${GIT_LINES_ADDED}${RST} ${COLOR_RED_DIM_VERY}−${GIT_LINES_REMOVED}${RST}"
     else
-        DIFF_ICON="${ANTHRO}${ICON_DIFF}${RST}"
-        DIFF_VALS="${DIM_GREEN}+${GIT_LINES_ADDED}${RST} ${DIM_RED}−${GIT_LINES_REMOVED}${RST}"
+        DIFF_ICON="${COLOR_ANTHRO}${ICON_DIFF}${RST}"
+        DIFF_VALS="${COLOR_GREEN_DIM}+${GIT_LINES_ADDED}${RST} ${COLOR_RED_DIM}−${GIT_LINES_REMOVED}${RST}"
     fi
-    GIT_SECTION="${SEP}${GIT_ICONS} ${BRANCH}${GIT_AB_DISPLAY} ${DIM}·${RST} ${FILES_ICON} ${FILES_VALS} ${DIM}·${RST} ${DIFF_ICON} ${DIFF_VALS}"
+    GIT_SECTION="${SEP}${GIT_ICONS} ${BRANCH}${GIT_AB_DISPLAY} ${COLOR_WHITE_DIM}·${RST} ${FILES_ICON} ${FILES_VALS} ${COLOR_WHITE_DIM}·${RST} ${DIFF_ICON} ${DIFF_VALS}"
 else
-    GIT_SECTION="${SEP}${CLI_NOT_FOUND}${ICON_BRANCH}${ICON_WORKTREE}${RST} ${DIM}—${RST}"
+    GIT_SECTION="${SEP}${CLI_NOT_FOUND}${ICON_BRANCH}${ICON_WORKTREE}${RST} ${COLOR_WHITE_DIM}—${RST}"
 fi
 
 # Dim session stats when no changes
 if [ "$SESSION_LINES_ADDED" -eq 0 ] && [ "$SESSION_LINES_REMOVED" -eq 0 ]; then
-    STATS_ICON="${ANTHRO_DIM}${ICON_STATS}${RST}"
-    STATS_VALS="${VERY_DIM}✚${SESSION_LINES_ADDED} −${SESSION_LINES_REMOVED}${RST}"
+    STATS_ICON="${COLOR_ANTHRO_DIM}${ICON_STATS}${RST}"
+    STATS_VALS="${COLOR_GREEN_DIM_VERY}✚${SESSION_LINES_ADDED}${RST} ${COLOR_RED_DIM_VERY}−${SESSION_LINES_REMOVED}${RST}"
 else
-    STATS_ICON="${ANTHRO}${ICON_STATS}${RST}"
-    STATS_VALS="${DIM_GREEN}✚${SESSION_LINES_ADDED}${RST} ${DIM_RED}−${SESSION_LINES_REMOVED}${RST}"
+    STATS_ICON="${COLOR_ANTHRO}${ICON_STATS}${RST}"
+    STATS_VALS="${COLOR_GREEN_DIM}✚${SESSION_LINES_ADDED}${RST} ${COLOR_RED_DIM}−${SESSION_LINES_REMOVED}${RST}"
 fi
 
 ACCOUNT_SECTION=""
 if [ -n "$ACCOUNT_EMAIL" ]; then
     EMAIL_USER="${ACCOUNT_EMAIL%%@*}"
     EMAIL_DOMAIN="${ACCOUNT_EMAIL#*@}"
-    ACCOUNT_SECTION="${SEP}${ANTHRO}${ICON_USER}${RST} ${EMAIL_USER}${DIM}@${RST}${EMAIL_DOMAIN}"
+    ACCOUNT_SECTION="${SEP}${COLOR_ANTHRO}${ICON_USER}${RST} ${EMAIL_USER}${COLOR_WHITE_DIM}@${RST}${EMAIL_DOMAIN}"
 fi
 
-echo -e "${ANTHRO}${ICON_VERSION}${RST} v${VERSION}${SEP}${ANTHRO}${ICON_MODEL}${RST} ${MODEL}${ACCOUNT_SECTION}${SEP}${ANTHRO}${ICON_CONTEXT}${RST} ${CTX_COLOR}${PCT}% ${BAR}${RST} ${TOKEN_DISPLAY}${SEP}${ANTHRO}${ICON_DURATION}${RST} ${DURATION} ${DIM}·${RST} ${ANTHRO}${ICON_API}${RST} ${API_TIME} ${DIM}·${RST} ${STATS_ICON} ${STATS_VALS}${GIT_SECTION}${TOOLS_SECTION}${SEP}${ANTHRO}${ICON_FOLDER}${RST} ${FOLDER}\n\xe2\x80\x8b"
+echo -e "${COLOR_ANTHRO}${ICON_VERSION}${RST} v${VERSION}${SEP}${COLOR_ANTHRO}${ICON_MODEL}${RST} ${MODEL}${ACCOUNT_SECTION}${SEP}${COLOR_ANTHRO}${ICON_CONTEXT}${RST} ${CTX_COLOR}${PCT}% ${BAR}${RST} ${TOKEN_DISPLAY}${SEP}${COLOR_ANTHRO}${ICON_DURATION}${RST} ${DURATION} ${COLOR_WHITE_DIM}·${RST} ${COLOR_ANTHRO}${ICON_API}${RST} ${API_TIME} ${COLOR_WHITE_DIM}·${RST} ${STATS_ICON} ${STATS_VALS}${GIT_SECTION}${TOOLS_SECTION}${SEP}${COLOR_ANTHRO}${ICON_FOLDER}${RST} ${FOLDER}\n\xe2\x80\x8b"
