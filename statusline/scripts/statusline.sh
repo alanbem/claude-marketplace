@@ -26,7 +26,7 @@ abbrev_tokens() {
         printf "${D}%s${R}" "$t"
     fi
 }
-TOKEN_DISPLAY="$(abbrev_tokens "$TOKENS")/$(abbrev_tokens "$CTX_SIZE")"
+TOKEN_TOTAL="$(abbrev_tokens "$CTX_SIZE")"
 
 # Context bar (20 units) with color-coded empty dots showing zone preview
 # Each unit = 5% of context window. Zones based on absolute token thresholds.
@@ -88,6 +88,20 @@ else
         CTX_COLOR="$BAR_ZONE_OK"
     fi
 fi
+
+# Token display: used tokens in zone color, total in default dim
+abbrev_tokens_color() {
+    local t=$1 color=$2
+    local R='\033[0m'
+    if [ "$t" -ge 1000000 ]; then
+        awk "BEGIN {printf \"${color}%.1f${R}M\", $t/1000000}"
+    elif [ "$t" -ge 1000 ]; then
+        awk "BEGIN {printf \"${color}%.0f${R}k\", $t/1000}"
+    else
+        printf "${color}%s${R}" "$t"
+    fi
+}
+TOKEN_DISPLAY="$(abbrev_tokens_color "$TOKENS" "$CTX_COLOR")/${TOKEN_TOTAL}"
 
 # Workspace dirs
 CWD=$(echo "$input" | jq -r '.workspace.current_dir // "."')
