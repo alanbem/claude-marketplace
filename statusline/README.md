@@ -49,17 +49,19 @@ Worktree detection works two ways: via Claude Code's native worktree field, and 
 **Ahead/behind remote** — shown after the branch name as arrows:
 - `↑2` (dim green) — commits ahead of remote
 - `↓1` (dim red) — commits behind remote
-- Zeros shown in dimmed white when there's nothing to push/pull
+- Zero values fade to a very dim version of their color (green/red) rather than disappearing
 
 **File stats** — changes at the file level compared to HEAD:
 - `+1` (dim green) — new files added
 - `~3` (dim orange) — files modified
 - `−0` (dim red) — files deleted
-- `?2` (dimmed white) — untracked files (not yet tracked by git)
+- `?2` (dim white) — untracked files (not yet tracked by git)
 
 **Line stats** — insertions and deletions compared to HEAD:
 - `+142` (dim green) — lines added
 - `−37` (dim red) — lines removed
+
+**Dimming** — zero values are dimmed individually. When all values in a subsection are zero, the section icon dims too. Layout stays stable while non-zero changes stand out.
 
 ### CLI Auth Status
 
